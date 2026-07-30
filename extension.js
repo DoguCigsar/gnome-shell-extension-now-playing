@@ -97,6 +97,7 @@ class NowPlayingIndicator extends PanelMenu.Button {
         this._playerProxy = null;
         this._playerProxySignalId = 0;
         this._dbusSignalId = 0;
+        this._menuOpenStateChangedId = 0;
         this._marqueeTimeoutId = 0;
         this._marqueePauseTimeoutId = 0;
         this._marqueeOffset = 0;
@@ -155,7 +156,7 @@ class NowPlayingIndicator extends PanelMenu.Button {
         this._playPauseItem = this._createActionRow('Play / Pause', () => this._invokePlayerAction('PlayPause'));
         this._nextItem = this._createActionRow('Next', () => this._invokePlayerAction('Next'));
 
-        this.menu.connect('open-state-changed', (_menu, isOpen) => {
+        this._menuOpenStateChangedId = this.menu.connect('open-state-changed', (_menu, isOpen) => {
             if (isOpen)
                 this._refreshFromBus();
         });
@@ -186,6 +187,11 @@ class NowPlayingIndicator extends PanelMenu.Button {
         if (this._dbusSignalId) {
             Gio.DBus.session.signal_unsubscribe(this._dbusSignalId);
             this._dbusSignalId = 0;
+        }
+
+        if (this._menuOpenStateChangedId) {
+            this.menu.disconnect(this._menuOpenStateChangedId);
+            this._menuOpenStateChangedId = 0;
         }
 
         this._detachPlayerProxy();
