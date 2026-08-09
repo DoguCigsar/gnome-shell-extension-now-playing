@@ -99,7 +99,8 @@ class NowPlayingIndicator extends PanelMenu.Button {
         this._dbusSignalId = 0;
         this._menuOpenStateChangedId = 0;
         this._marqueeTimeoutId = 0;
-        this._marqueePauseTimeoutId = 0;
+        this._marqueeStartTimeoutId = 0;
+        this._marqueeEndTimeoutId = 0;
         this._marqueeOffset = 0;
         this._marqueeTextWidth = 0;
         this._panelTextWidth = PANEL_TEXT_WIDTH;
@@ -119,6 +120,7 @@ class NowPlayingIndicator extends PanelMenu.Button {
         });
         this._panelBox = new St.BoxLayout({
             y_align: Clutter.ActorAlign.CENTER,
+            reactive: true,
             style_class: 'now-playing-panel-box',
         });
         this._labelContainer = new St.BoxLayout({
@@ -138,6 +140,14 @@ class NowPlayingIndicator extends PanelMenu.Button {
         this._label.clutter_text.line_wrap = false;
         this._label.x = 0;
         this._label.y = 0;
+
+        this._panelBox.connect('button-press-event', (_actor, event) => {
+            if (event.get_button() !== Clutter.BUTTON_SECONDARY)
+                return Clutter.EVENT_PROPAGATE;
+
+            this._togglePanelTextVisibility();
+            return Clutter.EVENT_STOP;
+        });
 
         this._labelContainer.add_child(this._label);
         this._panelBox.add_child(this._icon);
@@ -330,9 +340,14 @@ class NowPlayingIndicator extends PanelMenu.Button {
             this._marqueeTimeoutId = 0;
         }
 
-        if (this._marqueePauseTimeoutId) {
-            GLib.source_remove(this._marqueePauseTimeoutId);
-            this._marqueePauseTimeoutId = 0;
+        if (this._marqueeStartTimeoutId) {
+            GLib.source_remove(this._marqueeStartTimeoutId);
+            this._marqueeStartTimeoutId = 0;
+        }
+
+        if (this._marqueeEndTimeoutId) {
+            GLib.source_remove(this._marqueeEndTimeoutId);
+            this._marqueeEndTimeoutId = 0;
         }
 
         this._marqueeOffset = 0;
@@ -354,17 +369,28 @@ class NowPlayingIndicator extends PanelMenu.Button {
             return;
         }
 
-        this._marqueePauseTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MARQUEE_PAUSE_MS, () => {
-            this._marqueePauseTimeoutId = 0;
+        this._marqueeStartTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MARQUEE_PAUSE_MS, () => {
+            this._marqueeStartTimeoutId = 0;
             this._marqueeTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MARQUEE_DELAY_MS, () => {
                 this._marqueeOffset += MARQUEE_STEP;
-                const maxOffset = Math.max(0, this._marqueeTextWidth - PANEL_TEXT_WIDTH + 24);
+                const maxOffset = Math.max(0, this._marqueeTextWidth - this._panelTextWidth);
 
                 if (this._marqueeOffset >= maxOffset) {
-                    this._label.translation_x = 0;
-                    this._marqueeOffset = 0;
-                    this._stopMarquee();
-                    this._restartMarquee();
+                    this._marqueeOffset = maxOffset;
+                    this._label.translation_x = -this._marqueeOffset;
+
+                    if (this._marqueeTimeoutId) {
+                        GLib.source_remove(this._marqueeTimeoutId);
+                        this._marqueeTimeoutId = 0;
+                    }
+
+                    this._marqueeEndTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, MARQUEE_PAUSE_MS, () => {
+                        this._marqueeEndTimeoutId = 0;
+                        this._label.translation_x = 0;
+                        this._marqueeOffset = 0;
+                        this._restartMarquee();
+                        return GLib.SOURCE_REMOVE;
+                    });
                     return GLib.SOURCE_REMOVE;
                 }
 
@@ -416,6 +442,10 @@ class NowPlayingIndicator extends PanelMenu.Button {
         this._previousItem.setSensitive(Boolean(canControl && canGoPrevious));
         this._playPauseItem.setSensitive(Boolean(canControl));
         this._nextItem.setSensitive(Boolean(canControl && canGoNext));
+    }
+
+    _togglePanelTextVisibility() {
+        this._settings.set_boolean(SHOW_PANEL_TEXT_KEY, !this._showPanelText);
     }
 
     _renderNoPlayer() {

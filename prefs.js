@@ -98,7 +98,7 @@ export default class NowPlayingPreferences extends ExtensionPreferences {
             {label: 'Center', value: 'center'},
             {label: 'Left', value: 'left'},
         ]));
-        layoutGroup.add(_bindSwitchRow(settings, SHOW_PANEL_TEXT_KEY, 'Show text', 'Hide the track text and keep the icon only.'));
+        layoutGroup.add(_bindSwitchRow(settings, SHOW_PANEL_TEXT_KEY, 'Show text', 'Hide the track text and keep the icon only. You can also right-click the panel indicator to toggle it quickly.'));
         layoutGroup.add(_bindSpinRow(settings, PANEL_TEXT_WIDTH_KEY, 'Text width', 'Maximum width for the panel text before marquee scrolling kicks in.', 80, 400, 10));
 
         const textGroup = new Adw.PreferencesGroup({
